@@ -78,4 +78,4 @@ val_func = results.val_func
 pol_func = results.pol_func
 
 #### Value function converged in 669 iterations.
-#### 170.615123 seconds (2.14 G allocations: 191.075 GiB, 19.18% gc time)
+#### 135.648450 seconds (2.14 G allocations: 191.074 GiB, 8.54% gc time)
