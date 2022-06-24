@@ -1,5 +1,3 @@
-####hello everybody!
-
 using Parameters, Plots #read in necessary packages
 
 #global variables instead of structs
