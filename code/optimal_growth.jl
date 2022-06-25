@@ -1,4 +1,4 @@
-using Parameters, Plots #read in necessary packages
+using Parameters, Plots, LinearAlgebra #read in necessary packages
 
 #global variables instead of structs
 @with_kw struct Primitives
@@ -6,7 +6,7 @@ using Parameters, Plots #read in necessary packages
     θ::Float64 = 0.36 #capital share
     δ::Float64 = 0.025 #capital depreciation
     Π::Array{Float64, 2} = [0.977 0.023; 0.074 0.926] # Markov transition matrix
-    k_grid::Array{Float64,1} = collect(range(1.0, length = 1800, stop = 45.0)) #capital grid
+    k_grid::Array{Float64,1} = collect(range(0.1, length = 1000, stop = 45.0)) #capital grid
     Z_grid::Array{Float64,1} = [1.25; 0.2] # Productivity states
     nk::Int64 = length(k_grid) #number of capital elements
     nZ::Int64 = length(Z_grid)
@@ -52,7 +52,7 @@ function Solve_model()
 end
 
 #Bellman operator. Note the lack of type declarations in the function -- another exaple of sub-optimal coding
-function Bellman(prim::Primatives, res::results)
+function Bellman(prim::Primitives, res::Results)
     @unpack β, θ, δ, Π, k_grid, nk, Z_grid, nZ = prim #unpack primitive structure
 
     v_next = zeros(nk, nZ) # preallocate next value function
@@ -72,7 +72,7 @@ function Bellman(prim::Primatives, res::results)
                     # current state indexes the ROW of the transition matrix
                     # ⋅ is short for dot() - dot product to compute expectation
                     val = log(c) + β * (res.val_func[i_kp, 1:nZ] ⋅ Π[j_Z, 1:nZ])
-                    if val>candidate_max #check for new max value
+                    if val>max_util #check for new max value
                         max_util = val
                         res.pol_func[i_kp,j_Z] = kp #update policy function
                     end
@@ -84,5 +84,8 @@ function Bellman(prim::Primatives, res::results)
     v_next # return updated value function
 end
 
+## Solve model
 
-#############
+prim, res = Solve_model() #solve the model.
+Plots.plot(prim.k_grid, res.val_func) #plot value function
+Plots.plot(prim.k_grid, res.pol_func) #plot value function
