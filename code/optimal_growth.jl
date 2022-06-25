@@ -18,6 +18,39 @@ mutable struct Results
     pol_func::Array{Float64,2}
 end
 
+function Solve_model()
+    # initialize primitives and results
+    prim = Primitives()
+    val_func, pol_func = zeros(prim.nk, prim.nZ), zeros(prim.nk, prim.nZ)
+    res = Results(val_func, pol_func)
+
+    # initialize error and loop counter
+    error, n = 100, 0
+
+    # iterate value function until convergence
+    while error > eps()
+        n += 1
+
+        # update value function guess
+        v_next = Bellman(prim, res)
+
+        # compute error
+        error = maximum(abs.(v_next .- res.val_func))
+
+        # update results with new guess at value function
+        res.val_func = v_next
+
+        if mod(n, 5000) == 0 || error < eps()
+            println(" ")
+            println("*************************************************")
+            println("AT ITERATION = ", n)
+            println("MAX DIFFERENCE = ", error)
+            println("*************************************************")
+        end
+    end
+    prim, res
+end
+
 #Bellman operator. Note the lack of type declarations in the function -- another exaple of sub-optimal coding
 function Bellman(prim::Primatives, res::results)
     @unpack β, θ, δ, Π, k_grid, nk, Z_grid, nZ = prim #unpack primitive structure
@@ -28,9 +61,8 @@ function Bellman(prim::Primatives, res::results)
         Z = Z_grid[j_Z]
         for i_k = 1:nk #loop over capital state space
             max_util = -1e10 #something crappy
-            k = k_grid[i_k]#convert state indices to state values
-            # Need to add state-specific productivity here
-            budget = Z*k^θ + (1-δ)*k #budget given current state. Doesn't this look nice?
+            k = k_grid[i_k] #convert state indices to state values
+            budget = Z*k^θ + (1-δ)*k #budget given current state
 
             for i_kp = 1:nk #loop over choice of k'
                 kp = k_grid[i_kp]
@@ -42,7 +74,7 @@ function Bellman(prim::Primatives, res::results)
                     val = log(c) + β * (res.val_func[i_kp, 1:nZ] ⋅ Π[j_Z, 1:nZ])
                     if val>candidate_max #check for new max value
                         max_util = val
-                        res.pol_func[i_kp] = kp #update policy function
+                        res.pol_func[i_kp,j_Z] = kp #update policy function
                     end
                 end
             end
@@ -52,18 +84,5 @@ function Bellman(prim::Primatives, res::results)
     v_next # return updated value function
 end
 
-#more bad globals
-error = 100
-n = 0
-tol = 1e-4
-while error>tol
-    global n, val_func, error, pol_func #declare that we're using the global definitions of these variables in this loop
-    n+=1
-    v_next, pol_func = Bellman(val_func, pol_func)
-    error = maximum(abs.(val_func - v_next)) #reset error term
-    val_func = v_next #update value function held in results vector
-    println(n, "  ",  error)
-end
-println("Value function converged in ", n, " iterations.")
 
 #############
