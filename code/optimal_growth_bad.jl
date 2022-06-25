@@ -1,18 +1,24 @@
 using Parameters, Plots #read in necessary packages
 
 #global variables instead of structs
-β = 0.99 #discount rate.
-θ = 0.36 #capital share
-δ = 0.025 #capital depreciation
-k_grid = collect(range(1.0, length = 1800, stop = 45.0)) #capital grid
-nk = length(k_grid) #number of capital elements
+@with_kw struct Primitives
+    β::Float64 = 0.99 #discount rate.
+    θ::Float64 = 0.36 #capital share
+    δ::Float64 = 0.025 #capital depreciation
+    k_grid::Array{Float64,1} = collect(range(1.0, length = 1800, stop = 45.0)) #capital grid
+    nk::Int64 = length(k_grid) #number of capital elements
+end
 
 #initialize value function and policy functions, again as globals.
-val_func = zeros(nk)
-pol_func = zeros(nk)
+mutable struct Results
+    val_func::Array{Float64,1}
+    pol_func::Array{Float64,1}
+end
 
 #Bellman operator. Note the lack of type declarations inthe function -- another exaple of sub-optimal coding
 function Bellman(val_func, pol_func)
+
+
     v_next = zeros(nk)
 
     for i_k = 1:nk #loop over state space
