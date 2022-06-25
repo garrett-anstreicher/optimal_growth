@@ -5,41 +5,51 @@ using Parameters, Plots #read in necessary packages
     β::Float64 = 0.99 #discount rate.
     θ::Float64 = 0.36 #capital share
     δ::Float64 = 0.025 #capital depreciation
+    Π::Array{Float64, 2} = [0.977 0.023; 0.074 0.926] # Markov transition matrix
     k_grid::Array{Float64,1} = collect(range(1.0, length = 1800, stop = 45.0)) #capital grid
+    Z_grid::Array{Float64,1} = [1.25; 0.2] # Productivity states
     nk::Int64 = length(k_grid) #number of capital elements
+    nZ::Int64 = length(Z_grid)
 end
 
 #initialize value function and policy functions, again as globals.
 mutable struct Results
-    val_func::Array{Float64,1}
-    pol_func::Array{Float64,1}
+    val_func::Array{Float64,2}
+    pol_func::Array{Float64,2}
 end
 
-#Bellman operator. Note the lack of type declarations inthe function -- another exaple of sub-optimal coding
-function Bellman(val_func, pol_func)
+#Bellman operator. Note the lack of type declarations in the function -- another exaple of sub-optimal coding
+function Bellman(prim::Primatives, res::results)
+    @unpack β, θ, δ, Π, k_grid, nk, Z_grid, nZ = prim #unpack primitive structure
 
+    v_next = zeros(nk, nZ) # preallocate next value function
 
-    v_next = zeros(nk)
+    for j_Z = 1:nZ # loop over productivity states
+        Z = Z_grid[j_Z]
+        for i_k = 1:nk #loop over capital state space
+            max_util = -1e10 #something crappy
+            k = k_grid[i_k]#convert state indices to state values
+            # Need to add state-specific productivity here
+            budget = Z*k^θ + (1-δ)*k #budget given current state. Doesn't this look nice?
 
-    for i_k = 1:nk #loop over state space
-        candidate_max = -1e10 #something crappy
-        k = k_grid[i_k]#convert state indices to state values
-        budget = k^θ + (1-δ)*k #budget given current state. Doesn't this look nice?
+            for i_kp = 1:nk #loop over choice of k'
+                kp = k_grid[i_kp]
+                c = budget - kp #consumption
 
-        for i_kp = 1:nk #loop over choice of k_prime
-            kp = k_grid[i_kp]
-            c = budget - kp #consumption
-            if c>0 #check to make sure that consumption is positive
-                val = log(c) + β * val_func[i_kp]
-                if val>candidate_max #check for new max value
-                    candidate_max = val
-                    pol_func[i_k] = kp #update policy function
+                if c>0 #check to make sure that consumption is positive
+                    # current state indexes the ROW of the transition matrix
+                    # ⋅ is short for dot() - dot product to compute expectation
+                    val = log(c) + β * (res.val_func[i_kp, 1:nZ] ⋅ Π[j_Z, 1:nZ])
+                    if val>candidate_max #check for new max value
+                        max_util = val
+                        res.pol_func[i_kp] = kp #update policy function
+                    end
                 end
             end
+            v_next[i_k, j_Z] = max_util #update next guess of value function
         end
-        v_next[i_k] = candidate_max #update next guess of value function
     end
-    v_next, pol_func
+    v_next # return updated value function
 end
 
 #more bad globals
