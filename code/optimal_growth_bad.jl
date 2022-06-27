@@ -7,9 +7,9 @@ using Parameters, Plots #read in necessary packages
     δ::Float64 = 0.025 #depreciation
     k_grid::Array{Float64,1} = collect(range(0.1, length = 50, stop= 45.0)) #capital grid
     nk::Int64 = length(k_grid) #number of capital grid states
-    Pi::Array{Float64,2} = [0.977  0.023; 0.074  0.926]
-    prod_mat::Array{Float64,1} = [1.25, 0.2]
-    zk::Int64 = 2
+    Pi::Array{Float64,2} = [0.977  0.023; 0.074  0.926] #initialize productivity transition grid
+    prod_mat::Array{Float64,1} = [1.25, 0.2]#productivity matrix
+    zk::Int64 = 2#length of productivity vector
 end
 
 mutable struct Results
@@ -19,10 +19,9 @@ end
 
 function solve_model()
     prim = Primitives()
-    val_func, pol_func = zeros(prim.nk,2), zeros(prim.nk,2)
-    res = Results(val_func, pol_func)
+    val_func, pol_func = zeros(prim.nk,2), zeros(prim.nk,2)#initialize policy function vectors
+    res = Results(val_func, pol_func)#results
 
-    #more bad globals
     error = 100
     n = 0
     tol = 1e-4
@@ -88,10 +87,10 @@ end
 
 solve_model() #solve the model.
 
-#using Profile
+using Profile
 
-#Profile.clear()
-#@profile prim, res = solve_model()
-#Profile.print()
+Profile.clear()
+@profile solve_model()
+Profile.print()
 
 #############
