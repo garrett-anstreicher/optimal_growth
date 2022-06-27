@@ -30,7 +30,7 @@ function solve_model()
         n+=1
         v_next=zeros(prim.nk,2)
         for i in 1:2
-            v_next = Bellman(prim,res, i)
+            v_next[:,i] .= Bellman(prim,res, i)
         end
         error = maximum(abs.(res.val_func .- v_next)) #reset error term
         res.val_func = v_next
@@ -47,9 +47,13 @@ function solve_model()
     end
     prim,res
     println("Value function converged in ", n, " iterations.")
-    Plots.plot(prim.k_grid, res.val_func) #plot value function
-    Plots.plot(prim.k_grid, res.pol_func) #plot value function
-
+    println(res.val_func)
+    vfplot = Plots.plot(prim.k_grid, res.val_func, title="Value Functions", labels=["High Productivity" "Low Productivity"]) #plot value function
+    pfplot = Plots.plot(prim.k_grid, res.pol_func, title="Policy Functions", labels=["High Productivity" "Low Productivity"]) #plot value function
+    display(vfplot)
+    display(pfplot)
+    savefig(vfplot, "vfplot.png")
+    savefig(pfplot, "pfplot.png")
 end
 
 #Bellman operator. Note the lack of type declarations inthe function -- another exaple of sub-optimal coding
@@ -79,11 +83,10 @@ function Bellman(prim::Primitives, res::Results, prod_ind)
         end
         v_next[i_k,prod_ind] = candidate_max #update next guess of value function
     end
-    v_next
+    v_next[:,prod_ind]
 end
 
 solve_model() #solve the model.
-
 
 #using Profile
 
