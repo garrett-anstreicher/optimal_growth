@@ -1,24 +1,64 @@
 using Parameters, Plots #read in necessary packages
 
-#global variables instead of structs
-β = 0.99 #discount rate.
-θ = 0.36 #capital share
-δ = 0.025 #capital depreciation
-Pi = [0.977  0.023; 0.074  0.926]
-prod_mat = [1.25, 0.2]
-k_grid = collect(range(1.0, length = 1800, stop = 45.0)) #capital grid
-nk = length(k_grid) #number of capital elements
 
-#initialize value function and policy functions, again as globals.
-val_func = zeros(nk,2)
-pol_func = zeros(nk,2)
+@with_kw struct Primitives
+    β::Float64 = 0.99 #discount factor
+    θ::Float64 = 0.36 #production
+    δ::Float64 = 0.025 #depreciation
+    k_grid::Array{Float64,1} = collect(range(0.1, length = 50, stop= 45.0)) #capital grid
+    nk::Int64 = length(k_grid) #number of capital grid states
+    Pi::Array{Float64,2} = [0.977  0.023; 0.074  0.926]
+    prod_mat::Array{Float64,1} = [1.25, 0.2]
+    zk::Int64 = 2
+end
+
+mutable struct Results
+    val_func::Array{Float64,2}  #value function
+    pol_func::Array{Float64,2} #policy function
+end
+
+function solve_model()
+    prim = Primitives()
+    val_func, pol_func = zeros(prim.nk,2), zeros(prim.nk,2)
+    res = Results(val_func, pol_func)
+
+    #more bad globals
+    error = 100
+    n = 0
+    tol = 1e-4
+    while error>tol
+        n+=1
+        v_next=zeros(prim.nk,2)
+        for i in 1:2
+            v_next = Bellman(prim,res, i)
+        end
+        error = maximum(abs.(res.val_func .- v_next)) #reset error term
+        res.val_func = v_next
+        #update value function held in results vector
+        println(n, "  ",  error)
+
+        if mod(n, 5000) == 0 || error <tol
+            println(" ")
+            println("*************************************************")
+            println("AT ITERATION = ", n)
+            println("MAX DIFFERENCE = ", error)
+            println("*************************************************")
+        end
+    end
+    prim,res
+    println("Value function converged in ", n, " iterations.")
+    Plots.plot(prim.k_grid, res.val_func) #plot value function
+    Plots.plot(prim.k_grid, res.pol_func) #plot value function
+
+end
 
 #Bellman operator. Note the lack of type declarations inthe function -- another exaple of sub-optimal coding
-function Bellman(val_func, pol_func, prod_ind)
+function Bellman(prim::Primitives, res::Results, prod_ind)
+    @unpack β,δ,θ,nk, k_grid, Pi, prod_mat,zk = prim
     v_next = zeros(nk,2)
 
     for i_k = 1:nk #loop over state space
-        candidate_max = -1 #something crappy
+        candidate_max = -1e10 #something crappy
         k = k_grid[i_k]#convert state indices to state values
         prod = prod_mat[prod_ind] #convert current productivity index to productivity value
         budget = prod*k^θ + (1-δ)*k #budget given current state. Doesn't this look nice?
@@ -28,36 +68,27 @@ function Bellman(val_func, pol_func, prod_ind)
             c = budget - kp #consumption
             if c>0 #check to make sure that consumption is positive
                 val = log(c)
-                for i in 1:length(prod_mat)
-                    val += β*Pi[prod_ind,i]*val_func[i_kp, i]
+                for i in 1:zk
+                    val += β*Pi[prod_ind,i]*res.val_func[i_kp, i]
                 end
                 if val>candidate_max #check for new max value
                     candidate_max = val
-                    pol_func[i_k,prod_ind] = kp #update policy function
+                    res.pol_func[i_k,prod_ind] = kp #update policy function
                 end
             end
         end
         v_next[i_k,prod_ind] = candidate_max #update next guess of value function
     end
-    return v_next[:,prod_ind], pol_func
+    v_next
 end
 
-#more bad globals
-error = 100
-n = 0
-tol = 1e-4
-while error>tol
-    global n, val_func, error, pol_func #declare that we're using the global definitions of these variables in this loop
-    n+=1
-    v_next=zeros(nk,2)
-    for i in 1:length(prod_mat)
-        v_next[:,i], pol_func = Bellman(val_func, pol_func, i)
-    end
-    error = maximum(abs.(val_func - v_next)) #reset error term
-    val_func = v_next
-    #update value function held in results vector
-    println(n, "  ",  error)
-end
-println("Value function converged in ", n, " iterations.")
+solve_model() #solve the model.
+
+
+#using Profile
+
+#Profile.clear()
+#@profile prim, res = solve_model()
+#Profile.print()
 
 #############
