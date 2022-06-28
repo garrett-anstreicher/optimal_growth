@@ -1,55 +1,70 @@
-####hello everybody!
+#### Written-from-scratch code for stochastic growth model
 
-using Parameters, Plots #read in necessary packages
+using Parameters, Plots
 
-#global variables instead of structs
-β = 0.99 #discount rate.
-θ = 0.36 #capital share
-δ = 0.025 #capital depreciation
-k_grid = collect(range(1.0, length = 1800, stop = 45.0)) #capital grid
-nk = length(k_grid) #number of capital elements
+@with_kw struct Primitives
+    β::Float64 = 0.99
+    θ::Float64 = 0.36
+    δ::Float64 = 0.025
+    k_grid::Array{Float64, 1} = collect(range(0.01, length = 1000, stop = 45.0))
+    nk::Int64 = length(k_grid)
+    Π::Matrix{Float64} = [0.977 0.074; 0.023 0.926] # Transpose of original Markov transition matrix
+    Z::Vector{Float64} = [1.25, 0.2]
+end
 
-#initialize value function and policy functions, again as globals.
-val_func = zeros(nk)
-pol_func = zeros(nk)
+mutable struct Results
+    val_func::Matrix{Float64}
+    pol_func::Matrix{Float64}
+end
 
-#Bellman operator. Note the lack of type declarations inthe function -- another exaple of sub-optimal coding
-function Bellman(val_func, pol_func)
-    v_next = zeros(nk)
+function Solve_model()
+    prim = Primitives()
+    val_func = reshape(zeros(2*prim.nk),prim.nk,2)
+    pol_func = reshape(zeros(2*prim.nk),prim.nk,2)
+    res = Results(val_func, pol_func)
 
-    for i_k = 1:nk #loop over state space
-        candidate_max = -1e10 #something crappy
-        k = k_grid[i_k]#convert state indices to state values
-        budget = k^θ + (1-δ)*k #budget given current state. Doesn't this look nice?
+    error = 100
+    n = 0
 
-        for i_kp = 1:nk #loop over choice of k_prime
-            kp = k_grid[i_kp]
-            c = budget - kp #consumption
-            if c>0 #check to make sure that consumption is positive
-                val = log(c) + β * val_func[i_kp]
-                if val>candidate_max #check for new max value
-                    candidate_max = val
-                    pol_func[i_k] = kp #update policy function
-                end
-            end
+    while error > eps()
+        n += 1
+        v_next = Bellman(prim, res)
+        error = maximum(abs.(v_next .- res.val_func))
+        res.val_func = v_next
+
+        if mod(n, 5000) == 0 || error < eps()
+            println(" ")
+            println("******************************************")
+            println("AT ITERATION = ", n)
+            println("MAX DIFFERENCE = ", error)
+            println("******************************************")
         end
-        v_next[i_k] = candidate_max #update next guess of value function
     end
-    v_next, pol_func
+    prim, res
 end
 
-#more bad globals
-error = 100
-n = 0
-tol = 1e-4
-while error>tol
-    global n, val_func, error, pol_func #declare that we're using the global definitions of these variables in this loop
-    n+=1
-    v_next, pol_func = Bellman(val_func, pol_func)
-    error = maximum(abs.(val_func - v_next)) #reset error term
-    val_func = v_next #update value function held in results vector
-    println(n, "  ",  error)
-end
-println("Value function converged in ", n, " iterations.")
+function Bellman(prim::Primitives, res::Results)
+    @unpack β, θ, δ, nk, k_grid, Π, Z = prim
+    v_next = reshape(zeros(2*nk), nk, 2)
+    c = reshape(zeros(2*nk), nk , 2)
 
-#############
+    for i_k in 1:nk
+        k = k_grid[i_k]
+        for j in 1:2
+            budget = Z[j]*k^θ + (1-δ) * k
+            c[:,j] = budget .- k_grid
+            c[findall(c[:,j].<0),j] .= 0
+        end
+        val = log.(c) .+ β .* res.val_func * Π
+        v_next[i_k,1] = maximum(val[:,1])
+        v_next[i_k,2] = maximum(val[:,2])
+        res.pol_func[i_k,1] = k_grid[findall(val[:,1] .== maximum(val[:,1]))][1]
+        res.pol_func[i_k,2] = k_grid[findall(val[:,2] .== maximum(val[:,2]))][1]
+    end
+    v_next
+end
+
+@elapsed prim, res = Solve_model() # If loop over policy function space, it takes almost three times longer to compute.
+
+Plots.plot(prim.k_grid, hcat(res.val_func[:,1], res.val_func[:,2]); label = ["Good" "Bad"], legend = :bottomright)
+Plots.plot(prim.k_grid, hcat(res.pol_func[:,1], res.pol_func[:,2]); label = ["Good" "Bad"], legend = :bottomright)
