@@ -8,7 +8,7 @@ using Parameters, Plots, LinearAlgebra
     θ::Float64 = 0.36
     δ::Float64 = 0.025
     M::Array{Float64, 2} = [0.977 0.023; 0.074 0.926]
-    k_grid::Array{Float64,1} = collect(range(1.0, length = 1800, stop = 45.0))
+    k_grid::Array{Float64,1} = collect(range(1.0, length = 50, stop = 45.0))
     z_grid::Array{Float64,1} = [1.25, 0.2]
     nk::Int64 = length(k_grid)
     nz::Int64 = length(z_grid)
@@ -96,5 +96,8 @@ end
 
 # Check Functionality
 @elapsed prim, res = Solve_model()
-Plots.plot(prim.k_grid, prim.val_func)
-Plots.plot(primk.k_grid, res.pol_func)
+p1 = plot(prim.k_grid, res.value_func)
+p2 = plot(prim.k_grid, res.policy_func)
+
+# Plots
+Plots.plot(p1, p2, layout = (2,1), legend=:none)
